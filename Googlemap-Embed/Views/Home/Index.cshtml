@@ -1,0 +1,124 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps Embed</title>
+</head>
+<body>
+    <div id="map" style="width: 1300px; height: 650px;"></div>
+    <button onclick="saveDirections()" class="btn btn-success" style="margin-top:10px">Save</button>
+    <button onclick="undoDirections()" class="btn btn-danger" style="margin-top:10px">Undo</button>
+
+    <script async defer
+            src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDW-hofE4CUHNQrFidULLAm6LpCKkNfJso&callback=initMap"></script>
+
+    <script>
+        var map;
+        var markers = [];
+        var directionsService;
+        var directionsDisplay;
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 47.6062, lng: -122.3321 },
+                zoom: 14
+            });
+
+            directionsService = new google.maps.DirectionsService(); // for calculating the displaying route
+            directionsDisplay = new google.maps.DirectionsRenderer();
+            directionsDisplay.setMap(map);
+
+            map.addListener('click', function (event) {
+                addMarker(event.latLng);
+                calculateAndDisplayRoute();
+            });
+        }
+
+        function addMarker(location) {
+            var marker = new google.maps.Marker({
+                position: location,
+                map: map
+            });
+
+            markers.push(marker); // pushes the marker to the marker array
+        }
+
+        function calculateAndDisplayRoute() {
+            if (markers.length < 2) {
+                return; 
+            }
+
+            var waypoints = markers.map(function (marker) {
+                return {
+                    location: marker.getPosition(),
+                    stopover: true
+                };
+            });
+
+            var request = {
+                origin: markers[0].getPosition(),
+                destination: markers[markers.length - 1].getPosition(),
+                waypoints: waypoints.slice(1, -1),
+                travelMode: google.maps.TravelMode.DRIVING
+            };
+
+            directionsService.route(request, function (response, status) {
+                if (status === 'OK') {
+                    directionsDisplay.setDirections(response);
+                } else {
+                    window.alert('Directions request failed due to ' + status);
+                }
+            });
+        }
+
+        function saveDirections() { // save the points on the map
+            if (markers.length < 2) {
+                alert('Please add at least two markers to create a route.');
+                return;
+            }
+
+            var kmlData = '<?xml version="1.0" encoding="UTF-8"?>\n' + // After save than downlaord the file in kml
+                '<kml xmlns="http://www.opengis.net/kml/2.2">\n' +
+                '  <Document>\n' +
+                '    <name>Directions</name>\n' +
+                '    <description>Directions between markers</description>\n' +
+                '    <Style id="line">\n' +
+                '      <LineStyle>\n' +
+                '        <color>7f0000ff</color>\n' +
+                '        <width>5</width>\n' +
+                '      </LineStyle>\n' +
+                '    </Style>\n' +
+                '    <Placemark>\n' +
+                '      <name>Route</name>\n' +
+                '      <styleUrl>#line</styleUrl>\n' +
+                '      <LineString>\n' +
+                '        <coordinates>\n';
+
+            markers.forEach(function (marker) {
+                kmlData += marker.getPosition().lng() + ',' + marker.getPosition().lat() + '\n';
+            });
+
+            kmlData += '        </coordinates>\n' +
+                '      </LineString>\n' +
+                '    </Placemark>\n' +
+                '  </Document>\n' +
+                '</kml>';
+
+            var blob = new Blob([kmlData], { type: 'application/vnd.google-earth.kml+xml' });
+            var link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = 'directions.kml';
+            link.click();
+        }
+
+        function undoDirections() { // Remove the last points on the map
+            if (markers.length > 0) {
+                markers[markers.length - 1].setMap(null); 
+                markers.pop();
+                calculateAndDisplayRoute();
+            }
+        }
+    </script>
+</body>
+</html>
